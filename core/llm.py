@@ -2,6 +2,13 @@ import os
 
 from openai import OpenAI, APIError, APIConnectionError, RateLimitError
 
+PROVIDERS = {
+    "openai":     {"env_key": "OPENAI_API_KEY",     "base_url": None},
+    "groq":       {"env_key": "GROQ_API_KEY",       "base_url": "https://api.groq.com/openai/v1"},
+    "together":   {"env_key": "TOGETHER_API_KEY",    "base_url": "https://api.together.xyz/v1"},
+    "openrouter": {"env_key": "OPENROUTER_API_KEY",  "base_url": "https://openrouter.ai/api/v1"},
+    "ollama":     {"env_key": None,                  "base_url": "http://localhost:11434/v1"},
+}
 
 _client: OpenAI | None = None
 
@@ -9,10 +16,18 @@ _client: OpenAI | None = None
 def _get_client() -> OpenAI:
     global _client
     if _client is None:
-        api_key = os.getenv("OPENAI_API_KEY")
-        if not api_key:
-            raise RuntimeError("OPENAI_API_KEY not set — add it to your .env file")
-        _client = OpenAI(api_key=api_key)
+        provider = os.getenv("LLM_PROVIDER", "ollama").lower()
+        cfg = PROVIDERS.get(provider)
+        if not cfg:
+            raise RuntimeError(f"Unknown LLM_PROVIDER: {provider}. Options: {', '.join(PROVIDERS)}")
+
+        api_key = "ollama"  # default dummy key
+        if cfg["env_key"]:
+            api_key = os.getenv(cfg["env_key"], "")
+            if not api_key:
+                raise RuntimeError(f"{cfg['env_key']} not set — add it to secrets.zsh")
+
+        _client = OpenAI(api_key=api_key, base_url=cfg["base_url"])
     return _client
 
 
@@ -33,5 +48,3 @@ def chat(messages: list[dict]) -> str:
         return "Can't reach OpenAI right now. Internet might be napping like a cat 😿"
     except APIError as e:
         return f"meow meow... something went wrong with the API: {e.message}"
-    except RuntimeError as e:
-        return str(e)
