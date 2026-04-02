@@ -1,0 +1,33 @@
+# M1 Architecture
+
+## Overview
+
+```
+Browser  →  FastAPI (web/app.py)  →  LLM wrapper (core/llm.py)  →  OpenAI API
+                  ↕                        ↕
+            Jinja2 templates       Personality prompt (core/personality.py)
+            Static files           Memory (core/memory.py)
+```
+
+## Why FastAPI
+
+- Async out of the box — ready for WebSocket support in M2+ (streaming TTS)
+- Fast and lightweight, minimal boilerplate
+- Built-in request validation via Pydantic
+
+## Why OpenAI API First
+
+- Fastest path to a working chatbot — no GPU setup, no model downloads
+- Switch to local models (Ollama, vLLM) later without changing the interface
+- `core/llm.py` is the only file that talks to OpenAI — easy to swap
+
+## Components
+
+| Module | Responsibility |
+|--------|---------------|
+| `core/personality.py` | Character definition as a system prompt |
+| `core/llm.py` | OpenAI API wrapper — single `chat()` function |
+| `core/memory.py` | In-memory conversation history (sliding window, 20 msgs) |
+| `web/app.py` | FastAPI server, routes, template rendering |
+| `web/templates/` | Jinja2 HTML templates |
+| `web/static/` | CSS + JS for the chat UI |
