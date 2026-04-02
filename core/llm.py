@@ -33,3 +33,5 @@ def chat(messages: list[dict]) -> str:
         return "Can't reach OpenAI right now. Internet might be napping like a cat 😿"
     except APIError as e:
         return f"meow meow... something went wrong with the API: {e.message}"
+    except RuntimeError as e:
+        return str(e)
