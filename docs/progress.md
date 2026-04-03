@@ -10,8 +10,8 @@
 - [x] Chat UI (dark theme, message bubbles)
 - [x] README with run instructions
 - [x] Git repo initialized
-- [ ] Local testing with API key
-- [ ] Screenshot for README
+- [x] Local testing with API key
+- [x] Screenshot for README
 
 ## M2: Voice Output (TTS)
 

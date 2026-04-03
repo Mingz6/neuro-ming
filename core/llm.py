@@ -45,6 +45,7 @@ def chat(messages: list[dict]) -> str:
     except RateLimitError:
         return "meow... I'm being rate-limited. Give me a sec and try again 🐱"
     except APIConnectionError:
-        return "Can't reach OpenAI right now. Internet might be napping like a cat 😿"
+        provider = os.getenv("LLM_PROVIDER", "ollama")
+        return f"Can't reach {provider} right now. Internet might be napping like a cat 😿"
     except APIError as e:
         return f"meow meow... something went wrong with the API: {e.message}"
