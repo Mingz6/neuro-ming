@@ -56,6 +56,8 @@ Phase 5: PLATFORM
 
 - **Python** — FastAPI, OpenAI SDK
 - **Frontend** — Vanilla HTML/CSS/JS (no framework needed for M1)
-- **LLM** — OpenAI GPT-4o / GPT-4o-mini
+- **LLM** — Multi-provider: OpenAI, Groq, Together AI, OpenRouter, Ollama
 
-<!-- TODO: add screenshot -->
+## Screenshot
+
+![M1 Chat UI](docs/images/m1-chat-ui.png)
