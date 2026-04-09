@@ -1,6 +1,6 @@
 import os
 
-from openai import OpenAI, APIError, APIConnectionError, RateLimitError
+from openai import AsyncOpenAI, APIError, APIConnectionError, RateLimitError
 
 PROVIDERS = {
     "openai":     {"env_key": "OPENAI_API_KEY",     "base_url": None},
@@ -10,10 +10,10 @@ PROVIDERS = {
     "ollama":     {"env_key": None,                  "base_url": "http://localhost:11434/v1"},
 }
 
-_client: OpenAI | None = None
+_client: AsyncOpenAI | None = None
 
 
-def _get_client() -> OpenAI:
+def _get_client() -> AsyncOpenAI:
     global _client
     if _client is None:
         provider = os.getenv("LLM_PROVIDER", "ollama").lower()
@@ -27,20 +27,22 @@ def _get_client() -> OpenAI:
             if not api_key:
                 raise RuntimeError(f"{cfg['env_key']} not set — add it to secrets.zsh")
 
-        _client = OpenAI(api_key=api_key, base_url=cfg["base_url"])
+        _client = AsyncOpenAI(api_key=api_key, base_url=cfg["base_url"])
     return _client
 
 
-def chat(messages: list[dict]) -> str:
-    """Send conversation history to OpenAI and return the assistant's response."""
+async def chat(messages: list[dict]) -> str:
+    """Send conversation history and return the assistant's response."""
     model = os.getenv("MODEL_NAME", "gpt-4o-mini")
 
     try:
-        response = _get_client().chat.completions.create(
+        response = await _get_client().chat.completions.create(
             model=model,
             messages=messages,
             temperature=0.8,
         )
+        if not response.choices:
+            return "meow... the AI returned nothing. Try again? 🐱"
         return response.choices[0].message.content or ""
     except RateLimitError:
         return "meow... I'm being rate-limited. Give me a sec and try again 🐱"

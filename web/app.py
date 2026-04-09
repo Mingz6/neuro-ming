@@ -7,7 +7,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.requests import Request
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 # Load .env from project root
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
@@ -28,7 +28,7 @@ memory = Memory()
 
 
 class ChatRequest(BaseModel):
-    message: str
+    message: str = Field(..., max_length=4000)
 
 
 @app.get("/")
@@ -43,7 +43,7 @@ async def chat_endpoint(req: ChatRequest):
         return {"response": "meow? You didn't say anything 🐱"}
 
     memory.add_message("user", user_msg)
-    response = chat(memory.get_messages())
+    response = await chat(memory.get_messages())
     memory.add_message("assistant", response)
     return {"response": response}
 
