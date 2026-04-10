@@ -3,11 +3,13 @@
 ## Overview
 
 ```
-Browser  →  FastAPI (web/app.py)  →  LLM wrapper (core/llm.py)  →  OpenAI API
+Browser  →  FastAPI (web/app.py)  →  LLM wrapper (core/llm.py)  →  LLM Provider
                   ↕                        ↕
             Jinja2 templates       Personality prompt (core/personality.py)
             Static files           Memory (core/memory.py)
 ```
+
+All LLM calls are async (`AsyncOpenAI` / `AsyncAzureOpenAI`) so the event loop stays unblocked.
 
 ## Why FastAPI
 
@@ -25,9 +27,9 @@ Browser  →  FastAPI (web/app.py)  →  LLM wrapper (core/llm.py)  →  OpenAI 
 
 | Module | Responsibility |
 |--------|---------------|
-| `core/personality.py` | Character definition as a system prompt |
-| `core/llm.py` | OpenAI API wrapper — single `chat()` function |
+| `core/personality.py` | Character definition — real Ming persona as system prompt |
+| `core/llm.py` | Async multi-provider LLM wrapper — 6 providers, single `chat()` function |
 | `core/memory.py` | In-memory conversation history (sliding window, 20 msgs) |
-| `web/app.py` | FastAPI server, routes, template rendering |
+| `web/app.py` | FastAPI server, routes, input validation (4k char limit) |
 | `web/templates/` | Jinja2 HTML templates |
 | `web/static/` | CSS + JS for the chat UI |

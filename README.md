@@ -4,7 +4,7 @@ An AI assistant that starts as a chatbot and grows into a full AI VTuber with vo
 
 ## Current Status: M1 — Chatbot with Personality ✅
 
-A web-based chatbot powered by OpenAI, with a defined personality (curious, sarcastic, cat-obsessed). Dark-themed UI, multi-turn conversation, in-memory history.
+A web-based chatbot powered by Azure OpenAI GPT-5.2, with a personality modeled on the real Ming (dev voice, cat energy, smart home nerd). Dark-themed UI, multi-turn conversation, in-memory history.
 
 ## Run Locally
 
@@ -54,9 +54,10 @@ Phase 5: PLATFORM
 
 ## Tech Stack
 
-- **Python** — FastAPI, OpenAI SDK
+- **Python** — FastAPI (async), OpenAI SDK
 - **Frontend** — Vanilla HTML/CSS/JS (no framework needed for M1)
-- **LLM** — Multi-provider: OpenAI, Groq, Together AI, OpenRouter, Ollama
+- **LLM** — 6 providers: Azure OpenAI, OpenAI, Groq, Together AI, OpenRouter, Ollama
+- **Default model** — Azure OpenAI GPT-5.2 (`gpt-5-2-chat` deployment)
 
 ## Screenshot
 
