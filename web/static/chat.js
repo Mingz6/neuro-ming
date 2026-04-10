@@ -4,6 +4,8 @@ const messages = document.getElementById("messages");
 const typing = document.getElementById("typing");
 const clearBtn = document.getElementById("clear-btn");
 
+const sessionId = crypto.randomUUID();
+
 function addMessage(role, text) {
     const div = document.createElement("div");
     div.className = `message ${role}`;
@@ -34,7 +36,7 @@ form.addEventListener("submit", async (e) => {
         const res = await fetch("/chat", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ message: text }),
+            body: JSON.stringify({ message: text, session_id: sessionId }),
         });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
@@ -50,7 +52,11 @@ form.addEventListener("submit", async (e) => {
 
 clearBtn.addEventListener("click", async () => {
     if (!confirm("Clear the conversation?")) return;
-    await fetch("/clear", { method: "POST" });
+    await fetch("/clear", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ session_id: sessionId }),
+    });
     // Remove all messages except the greeting
     while (messages.children.length > 1) {
         messages.removeChild(messages.lastChild);

@@ -4,6 +4,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.requests import Request
@@ -16,19 +17,36 @@ load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from core.llm import chat
-from core.memory import Memory
+from core.memory import SessionStore
 
 app = FastAPI(title="Neuro-Ming")
+
+cors_origins = [
+    o.strip()
+    for o in os.getenv("CORS_ORIGINS", "http://localhost:4321").split(",")
+    if o.strip()
+]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=cors_origins,
+    allow_methods=["POST"],
+    allow_headers=["Content-Type"],
+)
 
 web_dir = Path(__file__).resolve().parent
 app.mount("/static", StaticFiles(directory=web_dir / "static"), name="static")
 templates = Jinja2Templates(directory=web_dir / "templates")
 
-memory = Memory()
+sessions = SessionStore()
 
 
 class ChatRequest(BaseModel):
     message: str = Field(..., max_length=4000)
+    session_id: str = Field(..., min_length=1, max_length=64)
+
+
+class ClearRequest(BaseModel):
+    session_id: str = Field(..., min_length=1, max_length=64)
 
 
 @app.get("/")
@@ -42,6 +60,7 @@ async def chat_endpoint(req: ChatRequest):
     if not user_msg:
         return {"response": "meow? You didn't say anything 🐱"}
 
+    memory = sessions.get(req.session_id)
     memory.add_message("user", user_msg)
     response = await chat(memory.get_messages())
     memory.add_message("assistant", response)
@@ -49,8 +68,8 @@ async def chat_endpoint(req: ChatRequest):
 
 
 @app.post("/clear")
-async def clear_endpoint():
-    memory.clear()
+async def clear_endpoint(req: ClearRequest):
+    sessions.clear(req.session_id)
     return {"status": "ok"}
 
 
