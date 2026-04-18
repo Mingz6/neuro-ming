@@ -72,3 +72,6 @@ async def chat(messages: list[dict]) -> str:
     except APIError as e:
         logger.error("LLM API error (provider=%s, model=%s): %s", os.getenv("LLM_PROVIDER", "ollama"), model, e.message)
         return f"meow meow... something went wrong with the API: {e.message}"
+    except Exception:
+        logger.exception("LLM unexpected failure (provider=%s, model=%s)", os.getenv("LLM_PROVIDER", "ollama"), model)
+        return "meow... something unexpected broke. Try again? 🐱"
