@@ -1,6 +1,9 @@
+import logging
 import os
 
 from openai import AsyncAzureOpenAI, AsyncOpenAI, APIError, APIConnectionError, RateLimitError
+
+logger = logging.getLogger(__name__)
 
 PROVIDERS = {
     "openai":       {"env_key": "OPENAI_API_KEY",     "base_url": None},
@@ -60,9 +63,12 @@ async def chat(messages: list[dict]) -> str:
             return "meow... the AI returned nothing. Try again? 🐱"
         return response.choices[0].message.content or ""
     except RateLimitError:
+        logger.warning("LLM rate-limited (provider=%s, model=%s)", os.getenv("LLM_PROVIDER", "ollama"), model)
         return "meow... I'm being rate-limited. Give me a sec and try again 🐱"
     except APIConnectionError:
         provider = os.getenv("LLM_PROVIDER", "ollama")
+        logger.warning("LLM connection failed (provider=%s)", provider)
         return f"Can't reach {provider} right now. Internet might be napping like a cat 😿"
     except APIError as e:
+        logger.error("LLM API error (provider=%s, model=%s): %s", os.getenv("LLM_PROVIDER", "ollama"), model, e.message)
         return f"meow meow... something went wrong with the API: {e.message}"
