@@ -2,9 +2,9 @@
 
 An AI assistant that starts as a chatbot and grows into a full AI VTuber with voice, avatar, game playing, and streaming. Each milestone is independently demoable — right now we're at M1: a chatbot with personality.
 
-## Current Status: M1 — Chatbot with Personality ✅
+## Current Status: M2 — Voice Output (TTS) ✅
 
-A web-based chatbot powered by Azure OpenAI GPT-5.2, with a personality modeled on the real Ming (dev voice, cat energy, smart home nerd). Dark-themed UI, multi-turn conversation, in-memory history.
+Web chatbot powered by Azure OpenAI GPT-5.2, now with text-to-speech. Bot responses are spoken aloud via Azure OpenAI TTS (mp3). Mute/unmute toggle, click-to-replay on each message. Works in both the standalone chat UI and the SolidJS widget on mingz.dev.
 
 ## Run Locally
 
@@ -21,8 +21,8 @@ python web/app.py
 
 ```
 Phase 1: FOUNDATION
-├── M1: Chatbot with personality  ← you are here
-├── M2: Voice output (TTS)
+├── M1: Chatbot with personality  ✅
+├── M2: Voice output (TTS)        ✅ ← you are here
 ├── M3: Voice input (STT)
 └── M4: Conversational loop (M1-M3 combined)
 
@@ -55,9 +55,10 @@ Phase 5: PLATFORM
 ## Tech Stack
 
 - **Python** — FastAPI (async), OpenAI SDK
-- **Frontend** — Vanilla HTML/CSS/JS (no framework needed for M1)
+- **Frontend** — Vanilla HTML/CSS/JS (standalone) + SolidJS widget (Astro site)
 - **LLM** — 6 providers: Azure OpenAI, OpenAI, Groq, Together AI, OpenRouter, Ollama
-- **Default model** — Azure OpenAI GPT-5.2 (`gpt-5-2-chat` deployment)
+- **TTS** — Azure OpenAI TTS (`tts` deployment, nova voice, mp3 format)
+- **Default model** — Azure OpenAI GPT-5.4 (`gpt-5.4` deployment)
 
 ## Screenshot
 
