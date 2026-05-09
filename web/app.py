@@ -18,6 +18,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from core.llm import chat
 from core.memory import SessionStore
+from core import tts
 
 app = FastAPI(title="Neuro-Ming")
 
@@ -43,6 +44,7 @@ sessions = SessionStore()
 class ChatRequest(BaseModel):
     message: str = Field(..., max_length=4000)
     session_id: str = Field(..., min_length=1, max_length=64)
+    tts_enabled: bool = Field(default=True)
 
 
 class ClearRequest(BaseModel):
@@ -50,6 +52,11 @@ class ClearRequest(BaseModel):
 
 
 @app.get("/")
+async def landing(request: Request):
+    return templates.TemplateResponse(request, "landing.html")
+
+
+@app.get("/chat")
 async def index(request: Request):
     return templates.TemplateResponse(request, "index.html")
 
@@ -64,7 +71,15 @@ async def chat_endpoint(req: ChatRequest):
     memory.add_message("user", user_msg)
     response = await chat(memory.get_messages())
     memory.add_message("assistant", response)
-    return {"response": response}
+
+    audio = None
+    if req.tts_enabled and tts.is_enabled():
+        audio = await tts.synthesize(response)
+
+    result: dict = {"response": response}
+    if audio:
+        result["audio"] = audio
+    return result
 
 
 @app.post("/clear")

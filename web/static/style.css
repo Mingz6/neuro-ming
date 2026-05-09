@@ -198,6 +198,33 @@ html, body {
     border-radius: 3px;
 }
 
+/* Header actions */
+.header-actions {
+    display: flex;
+    gap: 4px;
+}
+
+/* Replay button on bot messages */
+.replay-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 0.8rem;
+    opacity: 0;
+    transition: opacity 0.2s;
+    padding: 2px 4px;
+    margin-left: 4px;
+    align-self: flex-end;
+}
+
+.message.bot:hover .replay-btn {
+    opacity: 0.5;
+}
+
+.replay-btn:hover {
+    opacity: 1 !important;
+}
+
 /* Mobile */
 @media (max-width: 600px) {
     .message {
