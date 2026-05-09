@@ -1,7 +1,10 @@
 import logging
 import os
+import time
 
 from openai import AsyncAzureOpenAI, AsyncOpenAI, APIError, APIConnectionError, RateLimitError
+
+from core.ai_cost_log import log_call as _log_cost
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +21,7 @@ _client: AsyncOpenAI | None = None
 
 
 def _fallback_models(primary: str) -> list[str]:
-    raw = os.getenv("LLM_FALLBACK_MODELS", "gpt-5.4")
+    raw = os.getenv("LLM_FALLBACK_MODELS", "neuro-ming-gpt")
     fallbacks = [m.strip() for m in raw.split(",") if m.strip()]
     ordered = [primary, *fallbacks]
 
@@ -62,7 +65,7 @@ def _get_client() -> AsyncOpenAI:
 
 async def chat(messages: list[dict]) -> str:
     """Send conversation history and return the assistant's response."""
-    primary_model = os.getenv("MODEL_NAME", "gpt-5.4")
+    primary_model = os.getenv("MODEL_NAME", "neuro-ming-gpt")
     provider = os.getenv("LLM_PROVIDER", "ollama")
     models_to_try = _fallback_models(primary_model) if provider == "azure-openai" else [primary_model]
 
@@ -78,9 +81,25 @@ async def chat(messages: list[dict]) -> str:
                 kwargs["temperature"] = 0.8
 
             try:
+                start = time.perf_counter()
                 response = await _get_client().chat.completions.create(**kwargs)
+                duration_ms = int((time.perf_counter() - start) * 1000)
+
                 if not response.choices:
                     return "meow... the AI returned nothing. Try again? 🐱"
+
+                # Log cost
+                usage = response.usage
+                if usage and provider == "azure-openai":
+                    _log_cost(
+                        deployment=model,
+                        operation="chat",
+                        prompt_tokens=usage.prompt_tokens or 0,
+                        completion_tokens=usage.completion_tokens or 0,
+                        duration_ms=duration_ms,
+                        status="ok",
+                    )
+
                 return response.choices[0].message.content or ""
             except APIError as e:
                 last_api_error = e

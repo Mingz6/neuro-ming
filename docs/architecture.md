@@ -1,15 +1,19 @@
-# M1 Architecture
+# Architecture
 
 ## Overview
 
 ```
-Browser  →  FastAPI (web/app.py)  →  LLM wrapper (core/llm.py)  →  LLM Provider
+Browser  →  FastAPI (web/app.py)  →  LLM wrapper (core/llm.py)  →  Azure OpenAI (GPT-5.2)
                   ↕                        ↕
             Jinja2 templates       Personality prompt (core/personality.py)
             Static files           Memory (core/memory.py)
+                  ↕
+            TTS wrapper (core/tts.py)  →  Azure OpenAI TTS (oai-mingz-tts)
+                  ↕
+            Audio response (base64 mp3 in JSON)
 ```
 
-All LLM calls are async (`AsyncOpenAI` / `AsyncAzureOpenAI`) so the event loop stays unblocked.
+All LLM and TTS calls are async so the event loop stays unblocked.
 
 ## Why FastAPI
 
@@ -29,6 +33,7 @@ All LLM calls are async (`AsyncOpenAI` / `AsyncAzureOpenAI`) so the event loop s
 |--------|---------------|
 | `core/personality.py` | Character definition — real Ming persona as system prompt |
 | `core/llm.py` | Async multi-provider LLM wrapper — 6 providers, single `chat()` function |
+| `core/tts.py` | Async TTS wrapper — Azure OpenAI, returns base64-encoded mp3 |
 | `core/memory.py` | In-memory conversation history (sliding window, 20 msgs) |
 | `web/app.py` | FastAPI server, routes, input validation (4k char limit) |
 | `web/templates/` | Jinja2 HTML templates |
