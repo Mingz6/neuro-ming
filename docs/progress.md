@@ -28,15 +28,64 @@
 
 ## M3: Voice Input (STT)
 
-- [ ] Browser microphone capture
-- [ ] STT integration (Whisper)
-- [ ] Real-time transcription
+> Reference: `neuro-ming/comms/2026-05-09-summary.md` (voice memo — conversational AI architecture)
+
+- [ ] Browser microphone capture (push-to-talk first, VAD later)
+- [ ] STT integration — **evaluate Deepgram vs Azure STT vs Whisper**
+  - Deepgram recommended: most stable, best value for money (~$5-10 overall)
+  - Azure STT: already integrated, zero new infra
+  - Whisper (local): free, privacy-preserving, but adds latency
+- [ ] Wire STT into `/chat` endpoint (audio → transcript → LLM)
+- [ ] Real-time partial transcription display (show user what was heard)
+- [ ] **Evaluate ElevenLabs vs current Azure TTS nova voice**
+  - ElevenLabs creator plan: ~$20/month, considered best-in-class naturalness
+  - Azure TTS nova: already working, zero new infra
+  - Spike: same sentence through both, pick by ear
 
 ## M4: Conversational Loop
 
-- [ ] Combine M1+M2+M3
-- [ ] Push-to-talk or VAD
-- [ ] Interruption handling
+> Reference: `neuro-ming/comms/2026-05-09-summary.md` — two-tier voice AI architecture from voice memo
+
+**Architecture goal:** fast conversational shell (cheap model) + async Opus workers + shared bus
+
+```
+User Voice
+    │
+    ▼
+STT (Deepgram)
+    │
+    ▼
+Fast Shell (Haiku / cheap model)  ←─── always on, low latency
+    │   ├── simple reply → TTS → voice out
+    └── heavy task? → tool call → spawn Opus worker
+                                        │
+                                    work done
+                                        │
+                                    write → shared bus
+                                        │
+                            Haiku reads bus → TTS announce
+```
+
+- [ ] **Two-tier LLM split**
+  - Fast shell: Haiku (or GPT-4o-mini) for all voice I/O and routing
+  - Workers: Opus for actual tool execution (email, calendar, code, research)
+  - Shell never blocks on worker — stays responsive throughout
+- [ ] **Shared message bus**
+  - Simplest viable: in-process `asyncio.Queue` or dict keyed by task ID
+  - Workers post `{task_id, status, result, timestamp}` when done
+  - Shell polls / subscribes and announces completed tasks
+  - Future: Redis or SQLite for persistence across restarts
+- [ ] **Queue + announce UX**
+  - Immediate acknowledgement: "I've queued that, will let you know when it's done"
+  - Shell remains available for new requests while worker runs
+  - Proactive announcement when worker finishes (no user re-prompt needed)
+- [ ] **Parallel workers**
+  - Multiple tool calls can fire simultaneously (email + calendar + weather)
+  - Each posts independently to shared bus
+  - Shell announces each as they complete
+- [ ] Push-to-talk or VAD (voice activity detection)
+- [ ] Interruption handling (user speaks while TTS is playing)
+- [ ] Confirm agent framework for workers — research "PykeCat sub-agents" (possibly PocketFlow, Pydantic AI, or CrewAI)
 
 ## M5: Persona Eval Harness
 
