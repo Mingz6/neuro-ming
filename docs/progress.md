@@ -30,21 +30,26 @@
 
 > Reference: `neuro-ming/comms/2026-05-09-summary.md` (voice memo — conversational AI architecture)
 
-- [ ] Browser microphone capture (push-to-talk first, VAD later)
-- [ ] STT integration — **evaluate Deepgram vs Azure STT vs Whisper**
-  - Deepgram recommended: most stable, best value for money (~$5-10 overall)
-  - Azure STT: already integrated, zero new infra
-  - Whisper (local): free, privacy-preserving, but adds latency
-- [ ] Wire STT into `/chat` endpoint (audio → transcript → LLM)
-- [ ] Real-time partial transcription display (show user what was heard)
-- [ ] **Evaluate ElevenLabs vs current Azure TTS nova voice**
-  - ElevenLabs creator plan: ~$20/month, considered best-in-class naturalness
-  - Azure TTS nova: already working, zero new infra
-  - Spike: same sentence through both, pick by ear
+**Decision (2026-05-18): Use Pipecat framework for M3+M4.**
+The voice memo's "PykeCat sub-agents" = Pipecat + pipecat-subagents (transcription garbled the name).
+tend repo (`~/code/playground/tend`) is the reference implementation (291 commits, 8.5/10 quality).
+Pipecat handles STT + TTS + VAD + interruption + pipeline orchestration — no need to hand-roll.
+
+- [ ] Install `pipecat-ai` with extras: `pipecat-ai[deepgram,openai,silero]`
+- [ ] Create `core/voice_pipeline.py` — Pipecat pipeline with Local Transport (mic/speaker)
+- [ ] STT: Deepgram Nova-3 via Pipecat (best value, real-time streaming)
+- [ ] VAD: Silero VAD via Pipecat (voice activity detection — knows when user stops talking)
+- [ ] Wire existing `core/personality.py` system prompt into Pipecat LLM processor
+- [ ] Real-time partial transcription display (Pipecat emits interim results)
+- [ ] **Evaluate TTS in Pipecat context:**
+  - Option 1: Azure OpenAI TTS (already working, keep current)
+  - Option 2: ElevenLabs via Pipecat (better naturalness, ~$20/mo)
+  - Option 3: Cartesia Sonic (ultra-low latency, Pipecat native)
 
 ## M4: Conversational Loop
 
 > Reference: `neuro-ming/comms/2026-05-09-summary.md` — two-tier voice AI architecture from voice memo
+> **Framework: Pipecat + pipecat-subagents** (confirmed — same stack as tend)
 
 **Architecture goal:** fast conversational shell (cheap model) + async Opus workers + shared bus
 
@@ -66,26 +71,29 @@ Fast Shell (Haiku / cheap model)  ←─── always on, low latency
                             Haiku reads bus → TTS announce
 ```
 
-- [ ] **Two-tier LLM split**
-  - Fast shell: Haiku (or GPT-4o-mini) for all voice I/O and routing
-  - Workers: Opus for actual tool execution (email, calendar, code, research)
-  - Shell never blocks on worker — stays responsive throughout
-- [ ] **Shared message bus**
-  - Simplest viable: in-process `asyncio.Queue` or dict keyed by task ID
+- [ ] **Two-tier LLM split (Pipecat pipeline)**
+  - Fast shell: GPT-4o-mini or Haiku as the Pipecat LLM processor — handles all voice I/O
+  - Workers: Opus via **pipecat-subagents** for heavy tool execution
+  - Shell never blocks on worker — Pipecat pipeline stays responsive
+  - **Future: OpenAI Realtime API (Speech-to-Speech)** — skip STT+TTS entirely, ~300ms latency
+- [ ] **Shared message bus (pipecat-subagents pattern)**
+  - pipecat-subagents uses a shared message bus between agents (same as tend's Hub/Brain/Worker)
   - Workers post `{task_id, status, result, timestamp}` when done
-  - Shell polls / subscribes and announces completed tasks
-  - Future: Redis or SQLite for persistence across restarts
+  - Main pipeline announces completed tasks via TTS
+  - Simplest start: in-process asyncio, upgrade to Redis later
 - [ ] **Queue + announce UX**
   - Immediate acknowledgement: "I've queued that, will let you know when it's done"
-  - Shell remains available for new requests while worker runs
+  - Pipeline remains available for new requests while worker runs
   - Proactive announcement when worker finishes (no user re-prompt needed)
 - [ ] **Parallel workers**
   - Multiple tool calls can fire simultaneously (email + calendar + weather)
   - Each posts independently to shared bus
-  - Shell announces each as they complete
-- [ ] Push-to-talk or VAD (voice activity detection)
-- [ ] Interruption handling (user speaks while TTS is playing)
-- [ ] Confirm agent framework for workers — research "PykeCat sub-agents" (possibly PocketFlow, Pydantic AI, or CrewAI)
+  - Pipeline announces each as they complete
+- [ ] VAD-based turn detection (Silero VAD — included in Pipecat)
+- [ ] Interruption handling (Pipecat built-in — cancels TTS when user speaks)
+- [ ] **Framework: pipecat-ai + pipecat-subagents** (confirmed — "PykeCat sub-agents" from voice memo)
+  - Reference implementation: `~/code/playground/tend` (Hub/Brain/Worker pattern)
+  - pipecat-subagents GitHub: https://github.com/pipecat-ai/pipecat-subagents
 
 ## M5: Persona Eval Harness
 
