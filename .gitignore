@@ -4,8 +4,4 @@ __pycache__/
 .env
 .DS_Store
 logs/
-
-# Audio files (voice memos, transcription working files)
-*.m4a
-*.qta
-*.wav
+comms/
