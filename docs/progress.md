@@ -28,72 +28,58 @@
 
 ## M3: Voice Input (STT)
 
-> Reference: `neuro-ming/comms/2026-05-09-summary.md` (voice memo — conversational AI architecture)
+> References: `neuro-ming/comms/2026-05-09-summary.md` (voice memo), `specs/m3-m4-pipecat-voice.md` (Tend code study)
 
-**Decision (2026-05-18): Use Pipecat framework for M3+M4.**
-The voice memo's "PykeCat sub-agents" = Pipecat + pipecat-subagents (transcription garbled the name).
-tend repo (`~/code/playground/tend`) is the reference implementation (291 commits, 8.5/10 quality).
-Pipecat handles STT + TTS + VAD + interruption + pipeline orchestration — no need to hand-roll.
+**Decision (2026-05-21, post Tend code study): Do NOT add Pipecat for M3.**
+Pipecat's `LocalAudioTransport` assumes Pi/desktop, not browser. Browser audio via WebSocket + raw STT is simpler and gets M3 done faster. Pipecat evaluated for M5+ standalone desktop build.
 
-- [ ] Install `pipecat-ai` with extras: `pipecat-ai[deepgram,openai,silero]`
-- [ ] Create `core/voice_pipeline.py` — Pipecat pipeline with Local Transport (mic/speaker)
-- [ ] STT: Deepgram Nova-3 via Pipecat (best value, real-time streaming)
-- [ ] VAD: Silero VAD via Pipecat (voice activity detection — knows when user stops talking)
-- [ ] Wire existing `core/personality.py` system prompt into Pipecat LLM processor
-- [ ] Real-time partial transcription display (Pipecat emits interim results)
-- [ ] **Evaluate TTS in Pipecat context:**
-  - Option 1: Azure OpenAI TTS (already working, keep current)
-  - Option 2: ElevenLabs via Pipecat (better naturalness, ~$20/mo)
-  - Option 3: Cartesia Sonic (ultra-low latency, Pipecat native)
+Tend reference (`~/code/playground/tend`) is still the architectural blueprint — port patterns, not the framework.
 
-## M4: Conversational Loop
+- [ ] `core/stt.py` — Deepgram primary (streaming, 100ms), Azure STT fallback, Whisper offline
+- [ ] `web/audio_router.py` — WebSocket `/ws/voice` endpoint, PCM 16kHz mono buffering
+- [ ] Push-to-talk in browser UI (hold space = record, release = send)
+- [ ] Wire STT transcript → existing `core/llm.py` chat path (no new LLM code needed)
+- [ ] TTS spike: ElevenLabs vs current Azure nova (same sentence, pick by ear)
+- [ ] `.env.example`: add `STT_PROVIDER`, `DEEPGRAM_API_KEY`, `STT_ENABLED=false`
+- [ ] Verify `/chat` text endpoint unchanged (no regression)
 
-> Reference: `neuro-ming/comms/2026-05-09-summary.md` — two-tier voice AI architecture from voice memo
-> **Framework: Pipecat + pipecat-subagents** (confirmed — same stack as tend)
+## M4: Conversational Loop (Two-Tier Brain + Workers)
 
-**Architecture goal:** fast conversational shell (cheap model) + async Opus workers + shared bus
+> References: `neuro-ming/comms/2026-05-09-summary.md`, `specs/m3-m4-pipecat-voice.md`
+
+**Architecture:** Fast shell (Haiku, <300ms) stays always-on. Heavy tasks spawn async Claude CLI workers that bill against subscription (not API tokens — key billing trick from Tend). ProactiveAnnouncer delivers results via TTS even while shell is idle.
 
 ```
 User Voice
     │
     ▼
-STT (Deepgram)
+STT (Deepgram)          fast, streaming
     │
     ▼
-Fast Shell (Haiku / cheap model)  ←─── always on, low latency
+Fast Shell (Haiku)      low latency conversational shell
     │   ├── simple reply → TTS → voice out
-    └── heavy task? → tool call → spawn Opus worker
-                                        │
-                                    work done
-                                        │
-                                    write → shared bus
-                                        │
-                            Haiku reads bus → TTS announce
+    └── do_task() tool call
+                │
+           AsyncTaskBus (asyncio.Queue)
+                │
+        Claude CLI worker (Opus, subprocess, subscription billing)
+                │
+            result → ProactiveAnnouncer
+                │
+        TTS announce (even if user is silent)
+        + append to LLM context (next turn knows)
 ```
 
-- [ ] **Two-tier LLM split (Pipecat pipeline)**
-  - Fast shell: GPT-4o-mini or Haiku as the Pipecat LLM processor — handles all voice I/O
-  - Workers: Opus via **pipecat-subagents** for heavy tool execution
-  - Shell never blocks on worker — Pipecat pipeline stays responsive
-  - **Future: OpenAI Realtime API (Speech-to-Speech)** — skip STT+TTS entirely, ~300ms latency
-- [ ] **Shared message bus (pipecat-subagents pattern)**
-  - pipecat-subagents uses a shared message bus between agents (same as tend's Hub/Brain/Worker)
-  - Workers post `{task_id, status, result, timestamp}` when done
-  - Main pipeline announces completed tasks via TTS
-  - Simplest start: in-process asyncio, upgrade to Redis later
-- [ ] **Queue + announce UX**
-  - Immediate acknowledgement: "I've queued that, will let you know when it's done"
-  - Pipeline remains available for new requests while worker runs
-  - Proactive announcement when worker finishes (no user re-prompt needed)
-- [ ] **Parallel workers**
-  - Multiple tool calls can fire simultaneously (email + calendar + weather)
-  - Each posts independently to shared bus
-  - Pipeline announces each as they complete
-- [ ] VAD-based turn detection (Silero VAD — included in Pipecat)
-- [ ] Interruption handling (Pipecat built-in — cancels TTS when user speaks)
-- [ ] **Framework: pipecat-ai + pipecat-subagents** (confirmed — "PykeCat sub-agents" from voice memo)
-  - Reference implementation: `~/code/playground/tend` (Hub/Brain/Worker pattern)
-  - pipecat-subagents GitHub: https://github.com/pipecat-ai/pipecat-subagents
+**Key insight from Tend:** Workers never set `ANTHROPIC_API_KEY` in subprocess env — Claude CLI falls back to its own OAuth credentials (`~/.claude/.credentials.json`), billing the user's Claude subscription instead of per-token API. This makes Opus workers nearly free for personal use.
+
+- [ ] `core/bus.py` — minimal `asyncio.Queue` task bus (`enqueue`, `on_complete`, `subscribe`)
+- [ ] `workers/claude_cli.py` — ported from Tend; CLAUDE_CLI_CLEAR_ENV (30+ vars), ClaudeRunSpec, subprocess spawn
+- [ ] `core/announcer.py` — ported from Tend; cooldown 300s/category, defer-while-active, drain_pending, context append
+- [ ] `core/llm.py` — add `do_task(request: str)` tool, model split: Haiku shell / Opus workers
+- [ ] Queue+announce UX: immediate ack ("on it"), async TTS announce on completion
+- [ ] Parallel workers: multiple `do_task` calls run concurrently, each posts to bus independently
+- [ ] Worker timeout + error handling (default 120s, spoken fallback on failure)
+- [ ] Browser "working..." indicator, clears on announce
 
 ## M5: Persona Eval Harness
 
