@@ -19,6 +19,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from core.llm import chat
 from core.memory import SessionStore
 from core import tts
+from web.audio_router import router as voice_router, init as init_voice
 
 app = FastAPI(title="Neuro-Ming")
 
@@ -39,6 +40,10 @@ app.mount("/static", StaticFiles(directory=web_dir / "static"), name="static")
 templates = Jinja2Templates(directory=web_dir / "templates")
 
 sessions = SessionStore()
+
+# Wire voice WebSocket with shared session store
+init_voice(sessions)
+app.include_router(voice_router)
 
 
 class ChatRequest(BaseModel):
