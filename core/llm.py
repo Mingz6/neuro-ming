@@ -17,12 +17,6 @@ PROVIDERS = {
     "azure-openai": {"env_key": "AZURE_OPENAI_API_KEY", "base_url": None},
 }
 
-# Dual-loop model tiers (inspired by Josh's DEND hackathon project)
-# Fast loop: cheap model for casual chat, greetings, short Q&A
-# Slow loop: full model for complex reasoning, code, tool use
-TIER_FAST = "fast"
-TIER_SLOW = "slow"
-
 _client: AsyncOpenAI | None = None
 
 
@@ -69,53 +63,9 @@ def _get_client() -> AsyncOpenAI:
     return _client
 
 
-def _resolve_model(tier: str = TIER_SLOW) -> str:
-    """Pick model based on tier. Fast = cheap/small, Slow = full model."""
-    if tier == TIER_FAST:
-        return os.getenv("MODEL_NAME_FAST", os.getenv("MODEL_NAME", "neuro-ming-gpt"))
-    return os.getenv("MODEL_NAME", "neuro-ming-gpt")
-
-
-def classify_tier(user_message: str) -> str:
-    """Classify whether a message needs the fast or slow loop.
-
-    Fast loop: greetings, short questions, casual chat, yes/no, simple facts.
-    Slow loop: code, debugging, architecture, multi-step reasoning, analysis.
-    """
-    msg = user_message.lower().strip()
-    fast_signals = (
-        len(msg) < 40,
-        msg in ("hi", "hey", "hello", "sup", "yo", "meow", "thanks", "ok", "bye", "gn"),
-        msg.startswith(("who are you", "what's your name", "how are you", "what time")),
-        msg.endswith("?") and len(msg.split()) <= 8,
-    )
-    slow_signals = (
-        "code" in msg or "debug" in msg or "fix" in msg or "implement" in msg,
-        "explain" in msg and len(msg) > 50,
-        "```" in msg,
-        "function" in msg or "class " in msg or "def " in msg,
-        "architecture" in msg or "design" in msg or "tradeoff" in msg,
-        len(msg) > 200,
-    )
-    if any(slow_signals):
-        return TIER_SLOW
-    if sum(fast_signals) >= 2:
-        return TIER_FAST
-    return TIER_SLOW
-
-
-async def chat(messages: list[dict], tier: str | None = None) -> str:
-    """Send conversation history and return the assistant's response.
-
-    Dual-loop: tier='fast' uses a cheap model for casual chat,
-    tier='slow' (default) uses the full model for complex work.
-    If tier is None, auto-classifies from the last user message.
-    """
-    if tier is None:
-        last_user = next((m["content"] for m in reversed(messages) if m["role"] == "user"), "")
-        tier = classify_tier(last_user)
-
-    primary_model = _resolve_model(tier)
+async def chat(messages: list[dict]) -> str:
+    """Send conversation history and return the assistant's response."""
+    primary_model = os.getenv("MODEL_NAME", "neuro-ming-gpt")
     provider = os.getenv("LLM_PROVIDER", "ollama")
     models_to_try = _fallback_models(primary_model) if provider == "azure-openai" else [primary_model]
 
@@ -143,13 +93,12 @@ async def chat(messages: list[dict], tier: str | None = None) -> str:
                 if usage and provider == "azure-openai":
                     _log_cost(
                         deployment=model,
-                        operation=f"chat-{tier}",
+                        operation="chat",
                         prompt_tokens=usage.prompt_tokens or 0,
                         completion_tokens=usage.completion_tokens or 0,
                         duration_ms=duration_ms,
                         status="ok",
                     )
-                logger.info("LLM response (tier=%s, model=%s, %dms)", tier, model, duration_ms)
 
                 return response.choices[0].message.content or ""
             except APIError as e:
