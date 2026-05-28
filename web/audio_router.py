@@ -1,6 +1,8 @@
 """WebSocket audio router — /ws/voice endpoint for real-time voice conversation."""
 
 import asyncio
+import base64
+import json
 import logging
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
@@ -12,6 +14,9 @@ from core.memory import SessionStore
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+# 10 MB max audio buffer per connection (prevents OOM from malicious clients)
+MAX_AUDIO_BYTES = 10 * 1024 * 1024
 
 # Shared session store (imported from app at mount time, or standalone)
 _sessions: SessionStore | None = None
@@ -63,7 +68,6 @@ async def voice_ws(ws: WebSocket):
             # Text message = control frame
             if "text" in msg:
                 try:
-                    import json
                     data = json.loads(msg["text"])
                 except (json.JSONDecodeError, TypeError):
                     continue
@@ -90,6 +94,11 @@ async def voice_ws(ws: WebSocket):
             # Binary message = audio data
             elif "bytes" in msg:
                 if recording:
+                    if len(audio_buffer) + len(msg["bytes"]) > MAX_AUDIO_BYTES:
+                        await ws.send_json({"type": "error", "message": "Audio buffer exceeded 10 MB limit"})
+                        audio_buffer = bytearray()
+                        recording = False
+                        continue
                     audio_buffer.extend(msg["bytes"])
 
     except WebSocketDisconnect:
@@ -126,7 +135,6 @@ async def _process_voice_turn(ws: WebSocket, audio_bytes: bytes, session_id: str
     if tts.is_enabled():
         audio_b64 = await tts.synthesize(response)
         if audio_b64:
-            import base64
             audio_data = base64.b64decode(audio_b64)
             # Send in chunks for smoother playback
             chunk_size = 16384
