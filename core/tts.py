@@ -1,7 +1,10 @@
 import base64
+import logging
 import os
 
 from openai import AsyncAzureOpenAI, APIError, APIConnectionError
+
+logger = logging.getLogger(__name__)
 
 MAX_TTS_CHARS = 4096
 
@@ -39,6 +42,7 @@ async def synthesize(text: str) -> str | None:
 
     # OpenAI TTS caps at 4096 chars
     if len(text) > MAX_TTS_CHARS:
+        logger.warning("TTS text truncated from %d to %d chars", len(text), MAX_TTS_CHARS)
         text = text[:MAX_TTS_CHARS]
 
     try:

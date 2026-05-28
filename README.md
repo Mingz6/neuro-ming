@@ -2,11 +2,11 @@
 
 An AI assistant that starts as a chatbot and grows into a full AI VTuber with voice, avatar, game playing, and streaming. Each milestone is independently demoable — right now we're at M1: a chatbot with personality.
 
-## Current Status: M2 — Voice Output (TTS) ✅
+## Current Status: M3 — Voice Input (STT) 🚧
 
-Web chatbot powered by Azure OpenAI GPT-5.2, now with text-to-speech. Bot responses are spoken aloud via Azure OpenAI TTS (mp3). Mute/unmute toggle, click-to-replay on each message. Works in both the standalone chat UI and the SolidJS widget on mingz.dev.
+Web chatbot powered by Azure OpenAI GPT-5.4, with text-to-speech and voice input. STT via Deepgram (primary), Azure Speech (fallback), or Whisper (offline). Real-time voice conversation over WebSocket (`/ws/voice`). Works in both the standalone chat UI and the SolidJS widget on mingz.dev.
 
-**Next: M3+M4 — Pipecat-powered conversational voice loop** (STT + real-time pipeline + subagent workers)
+**Next: M4 — Conversational Loop** (two-tier brain + async workers)
 
 ## Run Locally
 
@@ -25,8 +25,8 @@ python web/app.py
 Phase 1: FOUNDATION
 ├── M1: Chatbot with personality            ✅
 ├── M2: Voice output (TTS)                  ✅
-├── M3: Voice input (STT via Pipecat)       ← next
-└── M4: Conversational loop (Pipecat + pipecat-subagents)
+├── M3: Voice input (STT + WebSocket)        🚧 in progress
+└── M4: Conversational loop (two-tier brain + workers)
 
 Phase 2: AVATAR
 ├── M5: Persona eval harness
@@ -58,24 +58,22 @@ Phase 5: PLATFORM
 
 | Layer | Technology | Why |
 |-------|-----------|-----|
-| Framework | **Pipecat** (12.3K⭐) | Most flexible, no vendor lock-in, proven by tend |
-| Multi-agent | **pipecat-subagents** | Hub/Brain/Worker pattern, shared message bus |
 | STT | Deepgram Nova-3 | Best real-time streaming, ~$0.01/min |
-| LLM (fast shell) | GPT-4o-mini / Haiku | Low latency voice loop |
-| LLM (workers) | Claude Opus | Heavy tool execution |
-| TTS | Azure OpenAI / ElevenLabs / Cartesia | Evaluate during M3 |
-| VAD | Silero (via Pipecat) | Voice activity detection |
+| STT fallback | Azure Speech / Whisper | Offline option + redundancy |
+| Transport | WebSocket (`/ws/voice`) | Browser-native, no framework dependency |
+| LLM (fast shell) | GPT-5.4-mini / Haiku | Low latency voice loop |
+| LLM (workers) | Claude Opus | Heavy tool execution via CLI (subscription billing) |
+| TTS | Azure OpenAI (nova) | Already working from M2 |
 | Future S2S | OpenAI Realtime API | Skip STT+TTS, ~300ms end-to-end |
-| Future telephony | Twilio Serializer (via Pipecat) | Same pipeline makes phone calls |
 
 ## Tech Stack
 
-- **Python** — FastAPI (async), OpenAI SDK, **Pipecat** (voice pipeline)
+- **Python** — FastAPI (async), OpenAI SDK
 - **Frontend** — Vanilla HTML/CSS/JS (standalone) + SolidJS widget (Astro site)
 - **LLM** — 6 providers: Azure OpenAI, OpenAI, Groq, Together AI, OpenRouter, Ollama
 - **TTS** — Azure OpenAI TTS (`tts` deployment, nova voice, mp3 format)
-- **STT** — Deepgram Nova-3 (via Pipecat, planned for M3)
-- **Voice Framework** — Pipecat + pipecat-subagents (planned for M3-M4)
+- **STT** — Deepgram Nova-3 (primary), Azure Speech (fallback), Whisper (offline)
+- **Voice transport** — WebSocket (`/ws/voice`) for real-time browser voice
 - **Default model** — Azure OpenAI GPT-5.4 (`gpt-5.4` deployment)
 
 ## Screenshot
