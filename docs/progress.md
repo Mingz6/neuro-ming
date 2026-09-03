@@ -35,14 +35,16 @@ Pipecat's `LocalAudioTransport` assumes Pi/desktop, not browser. Browser audio v
 
 Tend reference (`~/code/playground/tend`) is still the architectural blueprint — port patterns, not the framework.
 
-- [ ] `core/stt.py` — Deepgram primary (streaming, 100ms), Azure STT fallback, Whisper offline
-- [ ] `web/audio_router.py` — WebSocket `/ws/voice` endpoint, PCM 16kHz mono buffering
-- [ ] Push-to-talk in browser UI (hold space = record, release = send)
-- [ ] Wire STT transcript → existing `core/llm.py` chat path (no new LLM code needed)
-- [ ] TTS spike: ElevenLabs vs current Azure nova (same sentence, pick by ear)
-- [ ] `.env.example`: add `STT_PROVIDER`, `DEEPGRAM_API_KEY`, `STT_ENABLED=false`
-- [ ] Verify `/chat` text endpoint unchanged (no regression)
+- [x] `core/stt.py` — Deepgram primary (streaming, 100ms), Azure STT fallback, Whisper offline
+- [x] `web/audio_router.py` — WebSocket `/ws/voice` endpoint, PCM 16kHz mono buffering
+- [x] Push-to-talk in browser UI (hold space = record, release = send)
+- [x] Wire STT transcript → existing `core/llm.py` chat path (no new LLM code needed)
+- [x] TTS spike: ElevenLabs vs current Azure nova (same sentence, pick by ear)
+- [x] `.env.example`: add `STT_PROVIDER`, `DEEPGRAM_API_KEY`, `STT_ENABLED=false`
+- [x] Verify `/chat` text endpoint unchanged (no regression)
 
+
+**Shipped 2026-05-22 (`58e773b`). Boxes ticked 2026-09-03 — the code landed but nothing updated this file, so the task sat 'active' for 104 days.**
 ## M4: Conversational Loop (Two-Tier Brain + Workers)
 
 > References: `neuro-ming/comms/2026-05-09-summary.md`, `specs/m3-m4-pipecat-voice.md`
