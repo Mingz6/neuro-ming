@@ -1,6 +1,6 @@
 # Neuro-Ming — AI VTuber Assistant 🐱
 
-An AI assistant that starts as a chatbot and grows into a full AI VTuber with voice, avatar, game playing, and streaming. Each milestone is independently demoable — right now we're at M1: a chatbot with personality.
+An AI assistant that starts as a chatbot and grows into a full AI VTuber with voice, avatar, game playing, and streaming. Each milestone is independently demoable — right now we're at M3: voice input over WebSocket.
 
 ## Current Status: M3 — Voice Input (STT) 🚧
 
@@ -24,7 +24,7 @@ python web/app.py
 ```
 Phase 1: FOUNDATION
 ├── M1: Chatbot with personality            ✅
-├── M2: Voice output (TTS)                  ✅
+├── M2: Voice Output                        ✅
 ├── M3: Voice input (STT + WebSocket)        🚧 in progress
 └── M4: Conversational loop (two-tier brain + workers)
 

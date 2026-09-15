@@ -1,13 +1,14 @@
 # neuro-ming — Copilot Instructions
 
-AI VTuber assistant. Currently at **M2: Voice Output (TTS)**. Web chatbot with Azure OpenAI GPT-5.2 + TTS.
+AI VTuber assistant. Currently at **M3: Voice Input (STT)**. Web chatbot with pluggable LLM, TTS, and real-time voice over WebSocket.
 
 ## Stack
 
 - **Runtime:** Python 3.11+, FastAPI + Uvicorn
-- **LLM:** Azure OpenAI (GPT-5.2 for chat, TTS for voice)
+- **LLM:** six providers behind one interface — `LLM_PROVIDER` picks from ollama (default, local), azure, openai, groq, together, openrouter. Azure uses GPT-5.4 with a `gpt-4.1` fallback.
+- **Voice:** Azure OpenAI TTS (nova); STT via Deepgram → Azure Speech → Whisper offline
 - **Frontend:** plain HTML/JS in `web/` + SolidJS widget consumed by mingz-dev
-- **No database** — conversation memory is in-process for M1/M2
+- **No database** — conversation memory is in-process until M11
 
 ## Run
 
@@ -18,6 +19,9 @@ python web/app.py    # http://localhost:8000
 
 ## Conventions
 
+- The `README.md` roadmap (the block with the 🚧 marker) is the canonical current
+  milestone. When one lands, update it and the line at the top of this file — those
+  are the only two copies; four copies is how this drifted to M1/M2/M3 at once.
 - Each milestone (M1, M2, ...) is independently demoable. Don't break an earlier milestone when adding the next.
 - Secrets live in `.env` (never commit). `.env.example` stays in sync with every new variable.
 - Keep `core/` framework-free (pure Python). Web-specific code stays in `web/`.
