@@ -1,8 +1,10 @@
 # neuro-ming — Agent Instructions
 
-AI VTuber assistant. Currently at M2: Voice Output (TTS). Web chatbot with Azure OpenAI GPT-5.2 + TTS.
+AI VTuber assistant. Web chatbot with pluggable LLM, TTS, and real-time voice over WebSocket.
 
 See `.github/copilot-instructions.md` for full stack, structure, and conventions.
+The roadmap in `README.md` is the canonical answer to which milestone is current —
+this file deliberately does not restate it.
 
 ## Quick reference
 
