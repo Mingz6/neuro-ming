@@ -21,8 +21,9 @@ PRICING: dict[str, dict[str, float]] = {
     "gpt-5.3-chat": {"input": 1.75, "output": 14.0},
 }
 
+# neuro-ming-gpt runs gpt-5.4 and bills on the gpt-5.4 meters, not gpt-5.4-pro.
 DEPLOYMENT_TO_MODEL: dict[str, str] = {
-    "neuro-ming-gpt": "gpt-5.4-pro",
+    "neuro-ming-gpt": "gpt-5.4",
 }
 
 CAD_RATE = 1.38
