@@ -1,5 +1,6 @@
 import os
 import sys
+import time
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -22,6 +23,7 @@ from core import tts
 from web.audio_router import router as voice_router, init as init_voice
 
 app = FastAPI(title="Neuro-Ming")
+_started = time.monotonic()
 
 cors_origins = [
     o.strip()
@@ -56,9 +58,19 @@ class ClearRequest(BaseModel):
     session_id: str = Field(..., min_length=1, max_length=64)
 
 
+class HealthResponse(BaseModel):
+    status: str
+    uptime_seconds: float
+
+
 @app.get("/")
 async def landing(request: Request):
     return templates.TemplateResponse(request, "landing.html")
+
+
+@app.get("/health", response_model=HealthResponse)
+async def health() -> HealthResponse:
+    return HealthResponse(status="ok", uptime_seconds=round(time.monotonic() - _started, 2))
 
 
 @app.get("/chat")
