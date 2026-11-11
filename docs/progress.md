@@ -1,10 +1,14 @@
 # Progress Tracker
 
+Status on 2026-11-10: M1, M2 and M3 are done. M4 is next. The README lists the next three milestones and
+[roadmap.md](roadmap.md) has the full list. Milestone numbers from M8 on follow roadmap.md. The task lists
+for M8 to M12 below are older notes with different numbering. M5, M6, M7 and M12 match.
+
 ## M1: Chatbot with Personality
 
 - [x] Repo scaffolded
 - [x] Personality system prompt defined
-- [x] Personality upgraded — real Ming persona (mined from brain repo)
+- [x] Personality upgraded — real Ming persona (from my own working-style notes)
 - [x] PII scrubbed from persona (no location, no employer name, no family details)
 - [x] LLM wrapper (OpenAI)
 - [x] Multi-provider support (6 providers: azure-openai, openai, groq, together, openrouter, ollama)
@@ -21,33 +25,45 @@
 
 ## M2: Voice Output (TTS)
 
-- [x] TTS integration (Azure OpenAI tts deployment — separate resource in northcentralus)
+- [x] TTS integration (Azure OpenAI tts deployment, on its own resource separate from the chat model)
 - [x] Audio playback in standalone chat UI (mute toggle + replay button)
 - [x] Audio playback in SolidJS widget (mute toggle + replay button)
 - [ ] WebSocket streaming (deferred to M4)
 
 ## M3: Voice Input (STT)
 
-> References: `neuro-ming/comms/2026-05-09-summary.md` (voice memo), `specs/m3-m4-pipecat-voice.md` (Tend code study)
+> References: a private voice memo summary (not in the repo), [`specs/m3-m4-pipecat-voice.md`](../specs/m3-m4-pipecat-voice.md) (Tend code study)
 
 **Decision (2026-05-21, post Tend code study): Do NOT add Pipecat for M3.**
 Pipecat's `LocalAudioTransport` assumes Pi/desktop, not browser. Browser audio via WebSocket + raw STT is simpler and gets M3 done faster. Pipecat evaluated for M5+ standalone desktop build.
 
-Tend reference (`~/code/playground/tend`) is still the architectural blueprint — port patterns, not the framework.
+Tend (a local checkout, not in this repo) is still the architectural blueprint: port the patterns, not the framework.
 
-- [x] `core/stt.py` — Deepgram primary (streaming, 100ms), Azure STT fallback, Whisper offline
-- [x] `web/audio_router.py` — WebSocket `/ws/voice` endpoint, PCM 16kHz mono buffering
+- [x] `core/stt.py` — Deepgram (default), Azure Speech and Whisper, picked with `STT_PROVIDER`. The route sends one whole utterance to the provider after the key is released. A Deepgram streaming helper exists but the route does not call it. There is no automatic failover between providers.
+- [x] `web/audio_router.py` — WebSocket `/ws/voice` endpoint, buffers the browser's webm/opus frames until `stop` (10 MB cap)
 - [x] Push-to-talk in browser UI (hold space = record, release = send)
 - [x] Wire STT transcript → existing `core/llm.py` chat path (no new LLM code needed)
 - [x] TTS spike: ElevenLabs vs current Azure nova (same sentence, pick by ear)
 - [x] `.env.example`: add `STT_PROVIDER`, `DEEPGRAM_API_KEY`, `STT_ENABLED=false`
 - [x] Verify `/chat` text endpoint unchanged (no regression)
+- [x] Azure Speech and Whisper get 16 kHz mono WAV: the browser records webm/opus, so `core/stt.py` converts with `ffmpeg` first (2026-11-10, found by running the real path)
+- [x] `/ws/voice` ignores a JSON frame that is not an object instead of closing the socket (2026-11-10)
+- [x] pytest suite with no network, run by GitHub Actions on every push and pull request (2026-11-10)
+- [ ] Mic button in the mingz.dev widget (planned in the spec, not built; the widget has text chat and spoken replies only)
+
+**Verified end to end 2026-11-10.** A headless Chrome with a fake microphone held Space in `/chat`. The webm/opus
+recording went over `/ws/voice`, was transcribed by whisper.cpp (`base.en`), answered by the live LLM and
+spoken back by Azure OpenAI TTS. The same check from a Python WebSocket client (webm/opus file, then a WAV
+file) got the same result; a long answer came back as about 1 MB of mp3. Deepgram and Azure Speech were not run live (no keys on that machine); they are
+covered by tests against mocked HTTP responses.
+
+Known gap: `STT_ENABLED` is read by `stt.is_enabled()` but no route calls it, so `/ws/voice` is always on.
 
 
 **Shipped 2026-05-22 (`58e773b`). Boxes ticked 2026-09-03 — the code landed but nothing updated this file, so the task sat 'active' for 104 days.**
 ## M4: Conversational Loop (Two-Tier Brain + Workers)
 
-> References: `neuro-ming/comms/2026-05-09-summary.md`, `specs/m3-m4-pipecat-voice.md`
+> References: a private voice memo summary (not in the repo), [`specs/m3-m4-pipecat-voice.md`](../specs/m3-m4-pipecat-voice.md)
 
 **Architecture:** Fast shell (Haiku, <300ms) stays always-on. Heavy tasks spawn async Claude CLI workers that bill against subscription (not API tokens — key billing trick from Tend). ProactiveAnnouncer delivers results via TTS even while shell is idle.
 
@@ -92,10 +108,8 @@ Fast Shell (Haiku)      low latency conversational shell
 - [ ] LLM-as-judge with deterministic banned-phrase check (sourced from anti-AI-voice rules)
 - [ ] Markdown + JSON reports under `reports/eval/`, baseline committed
 - [ ] CI exit code based on aggregate score >= 4.0
-- [ ] **Foundry decision point** — evaluate upgrading `ai-mingz-dev` (Azure OpenAI) → Foundry resource to unlock Azure AI Evaluation SDK + auto-tracing. Upgrade is in-place (endpoint + keys preserved). See [`brain/cheatsheets/azure-ai-foundry-patterns.md`](../../../brain/cheatsheets/azure-ai-foundry-patterns.md). Decision criteria: if rolling our own grader is &lt;200 lines, stay on plain AOAI; if we want continuous eval / XPIA testing / cluster analysis, upgrade.
+- [ ] **Foundry decision point** — evaluate upgrading the Azure OpenAI resource → Foundry resource to unlock Azure AI Evaluation SDK + auto-tracing. Upgrade is in-place (endpoint + keys preserved). Decision criteria: if rolling our own grader is &lt;200 lines, stay on plain AOAI; if we want continuous eval / XPIA testing / cluster analysis, upgrade.
 - [ ] **OTel GenAI semconv on telemetry** — when wiring App Insights, use standard span attributes (`gen_ai.system`, `gen_ai.request.model`, `gen_ai.response.id`, `gen_ai.usage.input_tokens`, `gen_ai.usage.output_tokens`). Free Foundry compatibility — same KQL works post-upgrade.
-
-See queued task: `~/code/brain/copilot/delegate/queue/2026-04-19-neuro-ming-m5-eval-harness.md`
 
 ## M6: Conversation Simulator
 
@@ -114,7 +128,7 @@ See queued task: `~/code/brain/copilot/delegate/queue/2026-04-19-neuro-ming-m5-e
 - [ ] Output filter (block harmful generations) before TTS / response
 - [ ] Per-category thresholds in config (hate, violence, self-harm, sexual)
 - [ ] Bypass for trusted local sessions (env-gated)
-- [ ] **Foundry Content Safety SDK** — use `azure-ai-contentsafety` for input + output filtering. Single SDK call (~30 lines). Per-category severity thresholds (0–7). Works against plain Azure OpenAI today; auto-included if/when Foundry-resource upgrade happens. See [`brain/cheatsheets/azure-ai-foundry-patterns.md`](../../../brain/cheatsheets/azure-ai-foundry-patterns.md).
+- [ ] **Foundry Content Safety SDK** — use `azure-ai-contentsafety` for input + output filtering. Single SDK call (~30 lines). Per-category severity thresholds (0–7). Works against plain Azure OpenAI today; auto-included if/when Foundry-resource upgrade happens.
 
 ## M8: Hosted Deployment
 
@@ -133,7 +147,7 @@ See queued task: `~/code/brain/copilot/delegate/queue/2026-04-19-neuro-ming-m5-e
 - [ ] Custom events: per-turn latency, model used, token counts, cost estimate
 - [ ] Trace ID correlation across LLM calls + TTS
 - [ ] Dashboard JSON committed under `infra/dashboards/`
-- [ ] **Foundry AI Red Teaming Agent** — before public launch (mingz.dev `ChatWidget` exposed), run automated red-team scans: prompt injection, XPIA (cross-prompt injection through pasted URLs), policy violations. Requires Foundry resource upgrade or one-shot Foundry project alongside `ai-mingz-dev`. Document attacks caught + mitigations applied. See [`brain/cheatsheets/azure-ai-foundry-patterns.md`](../../../brain/cheatsheets/azure-ai-foundry-patterns.md) (Control Plane section).
+- [ ] **Foundry AI Red Teaming Agent** — before public launch (mingz.dev `ChatWidget` exposed), run automated red-team scans: prompt injection, XPIA (cross-prompt injection through pasted URLs), policy violations. Requires Foundry resource upgrade or one-shot Foundry project alongside the existing Azure OpenAI resource. Document attacks caught + mitigations applied.
 
 ## M10: Bring-Your-Own-LLM Routing
 
@@ -163,8 +177,7 @@ See queued task: `~/code/brain/copilot/delegate/queue/2026-04-19-neuro-ming-m5-e
 - [ ] **Domain-specific search skill** — bias retrieval toward identity-relevant chunks (vs generic semantic match)
 - [ ] Vector store: Azure AI Search (hosted) or sqlite-vec (local)
 - [ ] Eval coverage in M5 harness for memory recall + persona consistency under retrieval
-- [ ] **Foundry IQ exploration** — evaluate Foundry IQ as the knowledge base for grounding agent answers in `~/code/brain/` (citations included). Privacy gate: must exclude `family/`, `tax/`, `property/`, `crna/secrets/`, `1on1/` before any ingestion. If shipped, becomes the "talk to Ming's external brain" portfolio piece. Decision deferred to M12 review.
+- [ ] **Foundry IQ exploration** — evaluate Foundry IQ as the knowledge base for grounding agent answers in my own notes (citations included). Privacy gate: personal, financial and work notes stay out of any ingestion. If shipped, becomes the "talk to Ming's external notes" portfolio piece. Decision deferred to M12 review.
 - [ ] **Fine-tune small model on Ming voice (stretch)** — if prompt-engineering hits a ceiling on persona drift, evaluate fine-tuning Llama/Phi-1B on blog posts + commits + Teams history via Foundry. Only if M5 grader shows score plateau under retrieval. Otherwise skip — not worth the data-prep effort.
 
-See pattern reference: [`~/code/brain/cheatsheets/azure-ai-foundry-patterns.md`](../../../brain/cheatsheets/azure-ai-foundry-patterns.md)
 

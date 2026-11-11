@@ -71,6 +71,8 @@ async def voice_ws(ws: WebSocket):
                     data = json.loads(msg["text"])
                 except (json.JSONDecodeError, TypeError):
                     continue
+                if not isinstance(data, dict):
+                    continue
 
                 msg_type = data.get("type", "")
 

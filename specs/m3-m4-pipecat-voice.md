@@ -2,7 +2,7 @@
 
 **Status:** Active  
 **Source:** Tend/Jarvis repo study (Vancouver AI Meetup May 15 2026 — OpenClaw hackathon winner)  
-**Reference repo:** `/Users/mingz/code/playground/tend`  
+**Reference repo:** `tend`, a local checkout that is not part of this repo  
 **Updated:** 2026-05-21 (replaced draft with concrete findings from code study)
 
 ---
@@ -254,7 +254,7 @@ acknowledgement. I will announce the result when it's ready.
 
 | | Azure TTS (current, M2) | ElevenLabs |
 |---|---|---|
-| Voice | nova (good) | Rachel/Adam (best in class) |
+| Voice | nova (good) | ElevenLabs stock voices (best in class) |
 | Latency | ~300ms | ~200ms (turbo model) |
 | Cost | ~zero (Azure sub) | $20/mo creator plan |
 | API stability | Very stable | Generally stable |
@@ -314,12 +314,12 @@ Also worth testing: macOS AVSpeech (native, zero cost, `say` command + PyObjC). 
 
 ## References
 
-- Tend source: `/Users/mingz/code/playground/tend`
+- Tend source: the local `tend` checkout
 - Tend brain: `tend/src/tend/brain.py` — LLMAgent pattern, on_task_update
 - Tend announcer: `tend/src/tend/announcer.py` — port this directly
 - Tend claude_cli: `tend/src/tend/workers/claude_cli.py` — port this directly
 - Tend services: `tend/src/tend/services.py` — STT/TTS factory pattern
-- Meetup notes: `~/code/playground/vam-ai/meetings/2026/2026-05-15-openclaw-demos/notes-live.md`
-- Voice memo summary: `~/code/personal/neuro-ming/comms/2026-05-09-summary.md`
+- Meetup notes: private, not in this repo
+- Voice memo summary: private, not in this repo
 - PipeCat framework: https://github.com/pipecat-ai/pipecat
 - pipecat-subagents: https://github.com/pipecat-ai/pipecat-subagents
