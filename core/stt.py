@@ -1,10 +1,10 @@
-"""Speech-to-text module — Deepgram primary, Azure fallback, Whisper offline."""
+"""Speech-to-text. STT_PROVIDER picks one of Deepgram (default), Azure Speech or offline Whisper."""
 
 import asyncio
-import base64
 import json
 import logging
 import os
+import tempfile
 from collections.abc import AsyncIterator
 from enum import StrEnum
 
@@ -40,11 +40,14 @@ async def transcribe_once(audio_bytes: bytes) -> str | None:
     provider = _get_provider()
     if provider == STTProvider.DEEPGRAM:
         return await _deepgram_transcribe(audio_bytes)
-    elif provider == STTProvider.AZURE:
-        return await _azure_transcribe(audio_bytes)
-    elif provider == STTProvider.WHISPER:
-        return await _whisper_transcribe(audio_bytes)
-    return None
+    # Azure's REST endpoint and whisper.cpp only read WAV. The browser records
+    # webm/opus, so convert first. Deepgram sniffs the container itself.
+    wav = await _to_wav16k(audio_bytes)
+    if wav is None:
+        return None
+    if provider == STTProvider.AZURE:
+        return await _azure_transcribe(wav)
+    return await _whisper_transcribe(wav)
 
 
 async def transcribe_stream(audio_stream: AsyncIterator[bytes]) -> AsyncIterator[str]:
@@ -62,6 +65,41 @@ async def transcribe_stream(audio_stream: AsyncIterator[bytes]) -> AsyncIterator
             result = await transcribe_once(bytes(buffer))
             if result:
                 yield result
+
+
+# --- Audio conversion ---
+
+def _is_wav(audio_bytes: bytes) -> bool:
+    return audio_bytes[:4] == b"RIFF" and audio_bytes[8:12] == b"WAVE"
+
+
+async def _to_wav16k(audio_bytes: bytes) -> bytes | None:
+    """Return 16 kHz mono PCM WAV. WAV input passes through; anything else goes through ffmpeg."""
+    if _is_wav(audio_bytes):
+        return audio_bytes
+
+    ffmpeg_cmd = os.getenv("FFMPEG_CMD", "ffmpeg")
+    try:
+        with tempfile.TemporaryDirectory() as tmp:
+            src = os.path.join(tmp, "in.bin")
+            dst = os.path.join(tmp, "out.wav")
+            with open(src, "wb") as f:
+                f.write(audio_bytes)
+            proc = await asyncio.create_subprocess_exec(
+                ffmpeg_cmd, "-loglevel", "error", "-y", "-i", src,
+                "-ar", "16000", "-ac", "1", "-f", "wav", dst,
+                stdout=asyncio.subprocess.DEVNULL,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            _, stderr = await asyncio.wait_for(proc.communicate(), timeout=30.0)
+            if proc.returncode != 0:
+                logger.warning("ffmpeg failed (rc=%d): %s", proc.returncode, stderr.decode()[:200])
+                return None
+            with open(dst, "rb") as f:
+                return f.read() or None
+    except (FileNotFoundError, asyncio.TimeoutError, OSError) as e:
+        logger.warning("Could not convert audio to WAV (is ffmpeg installed?): %s", e)
+        return None
 
 
 # --- Deepgram ---
@@ -112,7 +150,7 @@ async def _deepgram_transcribe(audio_bytes: bytes) -> str | None:
 
 async def _deepgram_stream(audio_stream: AsyncIterator[bytes]) -> AsyncIterator[str]:
     """Deepgram WebSocket streaming STT with interim results."""
-    import websockets
+    from websockets.asyncio.client import connect
 
     api_key = os.getenv("DEEPGRAM_API_KEY", "")
     if not api_key:
@@ -134,7 +172,7 @@ async def _deepgram_stream(audio_stream: AsyncIterator[bytes]) -> AsyncIterator[
     headers = {"Authorization": f"Token {api_key}"}
 
     try:
-        async with websockets.connect(url, additional_headers=headers) as ws:
+        async with connect(url, additional_headers=headers) as ws:
             # Send audio in a background task
             async def send_audio():
                 async for chunk in audio_stream:
@@ -201,16 +239,15 @@ async def _azure_transcribe(audio_bytes: bytes) -> str | None:
 
 # --- Whisper (local via whisper.cpp or openai-whisper) ---
 
-async def _whisper_transcribe(audio_bytes: bytes) -> str | None:
-    """Local Whisper transcription via whisper.cpp CLI."""
-    import tempfile
-
+async def _whisper_transcribe(wav_bytes: bytes) -> str | None:
+    """Local Whisper transcription via whisper.cpp CLI. Expects 16 kHz mono WAV."""
     whisper_cmd = os.getenv("WHISPER_CMD", "whisper-cpp")
     model_path = os.getenv("WHISPER_MODEL", "")
 
+    tmp_path = None
     try:
         with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
-            f.write(audio_bytes)
+            f.write(wav_bytes)
             tmp_path = f.name
 
         cmd = [whisper_cmd, "-m", model_path, "-f", tmp_path, "--no-timestamps", "-l", "en"]
@@ -225,7 +262,7 @@ async def _whisper_transcribe(audio_bytes: bytes) -> str | None:
         stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=60.0)
 
         if proc.returncode != 0:
-            logger.warning("Whisper failed (rc=%d): %s", proc.returncode, stderr.decode()[:200])
+            logger.warning("Whisper failed (rc=%d): %s", proc.returncode, stderr.decode()[-200:])
             return None
 
         transcript = stdout.decode().strip()
@@ -234,8 +271,8 @@ async def _whisper_transcribe(audio_bytes: bytes) -> str | None:
         logger.warning("Whisper transcription failed: %s", e)
         return None
     finally:
-        import os as _os
-        try:
-            _os.unlink(tmp_path)
-        except (OSError, UnboundLocalError):
-            pass
+        if tmp_path:
+            try:
+                os.unlink(tmp_path)
+            except OSError:
+                pass
