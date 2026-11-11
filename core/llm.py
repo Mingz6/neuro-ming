@@ -58,7 +58,7 @@ def _get_client() -> AsyncOpenAI:
             if cfg["env_key"]:
                 api_key = os.getenv(cfg["env_key"], "")
                 if not api_key:
-                    raise RuntimeError(f"{cfg['env_key']} not set — add it to secrets.zsh")
+                    raise RuntimeError(f"{cfg['env_key']} not set. Export it in your shell or add it to .env")
             _client = AsyncOpenAI(api_key=api_key, base_url=cfg["base_url"])
     return _client
 

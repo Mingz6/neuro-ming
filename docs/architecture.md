@@ -1,36 +1,31 @@
 # Architecture
 
-## Overview (M1-M2: Current)
+The README has the diagrams. This page records how the pieces fit and what each module owns.
+
+## Today (M1 to M3)
 
 ```
-Browser  →  FastAPI (web/app.py)  →  LLM wrapper (core/llm.py)  →  Azure OpenAI (GPT-5.4)
-                  ↕                        ↕
-            Jinja2 templates       Personality prompt (core/personality.py)
-            Static files           Memory (core/memory.py)
-                  ↕
-            TTS wrapper (core/tts.py)  →  Azure OpenAI TTS (oai-mingz-tts)
-                  ↕
-            Audio response (base64 mp3 in JSON)
+Text:   Browser  →  POST /chat  →  web/app.py  →  core/memory.py  →  core/llm.py  →  LLM provider
+                                        ↓                                (persona from core/personality.py)
+                                   core/tts.py  →  Azure OpenAI TTS  →  base64 mp3 in the JSON reply
+
+Voice:  Browser mic (webm/opus)  →  WebSocket /ws/voice  →  web/audio_router.py
+            buffer until "stop"  →  core/stt.py  →  core/memory.py + core/llm.py  →  core/tts.py
+            →  transcript, reply text, mp3 in 16 KB frames, audio_end
 ```
 
-## Target Architecture (M3-M4: WebSocket Voice + Workers)
+Both routes share one `SessionStore`, so a typed question and a spoken follow-up land in the same conversation.
+
+## Next (M4): workers
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│             Browser (push-to-talk)                    │
-│  MediaRecorder → WebSocket /ws/voice                  │
-└──────────────────────────┬──────────────────────────────┘
-                          │
-                          ▼
-┌─────────────────────────────────────────────────────────┐
-│  audio_router.py (WebSocket server)                   │
-│  Binary audio in → STT → LLM → TTS → Binary audio out │
-└───────┬────────────────┬───────────────┬───────────────┘
-        │                │               │
-        ▼                ▼               ▼
-  core/stt.py      core/llm.py      core/tts.py
-  (Deepgram /      (GPT-5.4)        (Azure TTS)
-   Azure / Whisper)
+Browser (push-to-talk)  →  /ws/voice  →  STT  →  fast shell  →  TTS
+                                                      │
+                                              do_task() tool call
+                                                      ↓
+                                      asyncio.Queue  →  Claude CLI worker
+                                                      ↓
+                                      announcer  →  TTS, even if the user is silent
 ```
 
 **Key decisions (2026-05-21):**
@@ -39,9 +34,7 @@ Browser  →  FastAPI (web/app.py)  →  LLM wrapper (core/llm.py)  →  Azure O
 - **M4 workers** use Claude CLI subprocess (subscription billing, not API tokens).
 - **Future: OpenAI Realtime API** — replace STT+LLM+TTS with single S2S model (~300ms latency).
 
-## Current Components (M1-M2)
-
-## Current Components (M1-M2)
+## Current Components (M1-M3)
 
 | Module | Responsibility |
 |--------|---------------|
@@ -49,10 +42,11 @@ Browser  →  FastAPI (web/app.py)  →  LLM wrapper (core/llm.py)  →  Azure O
 | `core/llm.py` | Async multi-provider LLM wrapper — 6 providers, single `chat()` function |
 | `core/tts.py` | Async TTS wrapper — Azure OpenAI, returns base64-encoded mp3 |
 | `core/memory.py` | In-memory conversation history (sliding window, 20 msgs) |
-| `core/stt.py` | Async STT wrapper — Deepgram (primary), Azure Speech (fallback), Whisper (offline) |
-| `web/audio_router.py` | WebSocket `/ws/voice` endpoint — real-time voice conversation |
+| `core/stt.py` | Async STT wrapper. `STT_PROVIDER` picks Deepgram (default), Azure Speech or Whisper (offline). Azure and Whisper get WAV from `ffmpeg` |
+| `web/audio_router.py` | WebSocket `/ws/voice` endpoint, one turn per start/stop pair |
 | `web/app.py` | FastAPI server, routes, input validation (4k char limit) |
 | `web/templates/` | Jinja2 HTML templates |
+| `tests/` | pytest suite, no network, no API keys |
 | `web/static/` | CSS + JS for the chat UI |
 
 ## Planned Components (M4)
@@ -75,7 +69,7 @@ M3-M4 does NOT delete M1-M2 code. Instead:
 
 ## Reference Implementation
 
-- **tend** (`~/code/playground/tend`): Desktop voice assistant with Hub/Brain/Worker pattern
+- **tend** (a local checkout, not in this repo): Desktop voice assistant with Hub/Brain/Worker pattern
   - Architectural inspiration for M4 workers (ported patterns, not the Pipecat framework)
   - OpenWakeWordGate concept for future privacy boundary
   - ProactiveAnnouncer for unprompted updates
