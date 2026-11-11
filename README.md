@@ -134,7 +134,7 @@ sequenceDiagram
 | M2 Voice output | ✅ | TTS in the chat UI and in the mingz.dev widget, mute and replay |
 | M3 Voice input | ✅ | Push-to-talk in `/chat`, STT, same LLM path, spoken reply |
 
-I ran M3 end to end with the offline Whisper provider: a webm/opus recording from a headless Chrome microphone went in over `/ws/voice`, and the transcript, the reply and about a megabyte of mp3 came back. Deepgram and Azure Speech are covered by tests against mocked HTTP responses, not by a live call in this release.
+I ran M3 end to end with the offline Whisper provider. A webm/opus recording went in over `/ws/voice`, once from a Python client and once from headless Chrome with a fake microphone, and the transcript, the reply and mp3 audio came back each time. Deepgram and Azure Speech are covered by tests against mocked HTTP responses, not by a live call in this release.
 
 Voice input is in the standalone UI only. The mingz.dev widget has text chat and spoken replies, not a mic button. Per-milestone notes live in [docs/progress.md](docs/progress.md).
 

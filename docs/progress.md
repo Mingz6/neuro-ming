@@ -40,7 +40,7 @@ Pipecat's `LocalAudioTransport` assumes Pi/desktop, not browser. Browser audio v
 Tend (a local checkout, not in this repo) is still the architectural blueprint: port the patterns, not the framework.
 
 - [x] `core/stt.py` — Deepgram (default), Azure Speech and Whisper, picked with `STT_PROVIDER`. The route sends one whole utterance to the provider after the key is released. A Deepgram streaming helper exists but the route does not call it. There is no automatic failover between providers.
-- [x] `web/audio_router.py` — WebSocket `/ws/voice` endpoint, PCM 16kHz mono buffering
+- [x] `web/audio_router.py` — WebSocket `/ws/voice` endpoint, buffers the browser's webm/opus frames until `stop` (10 MB cap)
 - [x] Push-to-talk in browser UI (hold space = record, release = send)
 - [x] Wire STT transcript → existing `core/llm.py` chat path (no new LLM code needed)
 - [x] TTS spike: ElevenLabs vs current Azure nova (same sentence, pick by ear)
@@ -53,8 +53,8 @@ Tend (a local checkout, not in this repo) is still the architectural blueprint: 
 
 **Verified end to end 2026-11-10.** A headless Chrome with a fake microphone held Space in `/chat`. The webm/opus
 recording went over `/ws/voice`, was transcribed by whisper.cpp (`base.en`), answered by the live LLM and
-spoken back by Azure OpenAI TTS (about 1 MB of mp3 for a long answer). The same check from a Python WebSocket
-client got the same result. Deepgram and Azure Speech were not run live (no keys on that machine); they are
+spoken back by Azure OpenAI TTS. The same check from a Python WebSocket client (webm/opus file, then a WAV
+file) got the same result; a long answer came back as about 1 MB of mp3. Deepgram and Azure Speech were not run live (no keys on that machine); they are
 covered by tests against mocked HTTP responses.
 
 Known gap: `STT_ENABLED` is read by `stt.is_enabled()` but no route calls it, so `/ws/voice` is always on.

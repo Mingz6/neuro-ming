@@ -12,6 +12,9 @@ import httpx
 
 logger = logging.getLogger(__name__)
 
+FFMPEG_TIMEOUT = 30.0
+WHISPER_TIMEOUT = 60.0
+
 
 class STTProvider(StrEnum):
     DEEPGRAM = "deepgram"
@@ -69,6 +72,16 @@ async def transcribe_stream(audio_stream: AsyncIterator[bytes]) -> AsyncIterator
 
 # --- Audio conversion ---
 
+async def _communicate(proc: asyncio.subprocess.Process, timeout: float) -> tuple[bytes, bytes]:
+    """Wait for a subprocess. On timeout, kill it so a stuck tool does not pile up."""
+    try:
+        return await asyncio.wait_for(proc.communicate(), timeout=timeout)
+    except asyncio.TimeoutError:
+        proc.kill()
+        await proc.wait()
+        raise
+
+
 def _is_wav(audio_bytes: bytes) -> bool:
     return audio_bytes[:4] == b"RIFF" and audio_bytes[8:12] == b"WAVE"
 
@@ -91,7 +104,7 @@ async def _to_wav16k(audio_bytes: bytes) -> bytes | None:
                 stdout=asyncio.subprocess.DEVNULL,
                 stderr=asyncio.subprocess.PIPE,
             )
-            _, stderr = await asyncio.wait_for(proc.communicate(), timeout=30.0)
+            _, stderr = await _communicate(proc, FFMPEG_TIMEOUT)
             if proc.returncode != 0:
                 logger.warning("ffmpeg failed (rc=%d): %s", proc.returncode, stderr.decode()[:200])
                 return None
@@ -259,7 +272,7 @@ async def _whisper_transcribe(wav_bytes: bytes) -> str | None:
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
-        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=60.0)
+        stdout, stderr = await _communicate(proc, WHISPER_TIMEOUT)
 
         if proc.returncode != 0:
             logger.warning("Whisper failed (rc=%d): %s", proc.returncode, stderr.decode()[-200:])

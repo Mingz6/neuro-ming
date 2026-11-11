@@ -354,3 +354,27 @@ async def test_deepgram_stream_sends_audio_and_yields_final_transcripts(monkeypa
 
 async def test_deepgram_stream_without_a_key_yields_nothing():
     assert [text async for text in stt.transcribe_stream(chunks(b"aa"))] == []
+
+
+# --- a stuck tool is killed, not left running ---
+
+def pid_alive(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    return True
+
+
+@pytest.mark.parametrize("env_var, timeout_name, call", [
+    ("FFMPEG_CMD", "FFMPEG_TIMEOUT", lambda: stt._to_wav16k(WEBM_BYTES)),
+    ("WHISPER_CMD", "WHISPER_TIMEOUT", lambda: stt._whisper_transcribe(WAV_BYTES)),
+])
+async def test_a_hung_tool_is_killed_after_the_timeout(monkeypatch, tmp_path, env_var, timeout_name, call):
+    pid_file = tmp_path / "pid"
+    cmd = write_script(tmp_path / "hang", f"echo $$ > {pid_file}\nexec sleep 30\n")
+    monkeypatch.setenv(env_var, cmd)
+    monkeypatch.setattr(stt, timeout_name, 0.5)
+    assert await call() is None
+    pid = int(pid_file.read_text())
+    assert not pid_alive(pid)
